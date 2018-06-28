@@ -1,0 +1,7 @@
+cp -f ./cdn /usr/local/bin
+mkdir -p /etc/cdn
+cp ./apiserver.yaml /etc/cdn/apiserver.yaml
+cp -f ./*.tpl /etc/cdn/
+cp -f ./supervisor.service /usr/lib/systemd/system/
+systemctl enable supervisor.service
+systemctl daemon-reload

@@ -1,0 +1,14 @@
+package: github.com/fleacloud/cdn
+import:
+- package: github.com/coreos/etcd
+  version: ~3.2.9
+  subpackages:
+  - clientv3
+- package: github.com/fleacloud/app
+- package: github.com/go-macaron/binding
+- package: github.com/spf13/cobra
+  version: ~0.0.1
+- package: github.com/spf13/viper
+  version: ~1.0.0
+- package: gopkg.in/macaron.v1
+  version: ~1.2.3

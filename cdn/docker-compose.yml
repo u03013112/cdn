@@ -1,0 +1,13 @@
+version: '3.3'
+services:
+    cdnapi: 
+      container_name: cdnapi
+      image: registry.cn-hangzhou.aliyuncs.com/fleacloud/cdnapi:latest
+      ports: 
+        - "8000:8000"
+      environment:
+        MACVLAN_PARENT: eth0
+      volumes:
+        - /var/run:/var/run
+        - /opt/cdn:/opt/cdn
+      restart: always
