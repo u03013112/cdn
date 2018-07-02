@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	// "log"
 	"net/http"
 	"strings"
@@ -12,113 +13,15 @@ import (
 	macaron "gopkg.in/macaron.v1"
 )
 
-// func searchRules(dir string) ([]*StreamRule, error) {
-// 	var list []*StreamRule
-// 	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
-// 		if f == nil {
-// 			log.Errorf(err.Error())
-// 			return err
-// 		}
-// 		if f.IsDir() {
-// 			return nil
-// 		}
-
-// 		var rule StreamRule
-
-// 		nf, err := os.Open(path)
-// 		if err != nil {
-// 			log.Errorf(err.Error())
-// 			return err
-// 		}
-
-// 		if err := rule.Load(nf); err != nil {
-// 			log.Errorf(err.Error())
-// 			return err
-// 		}
-
-// 		list = append(list, &rule)
-
-// 		return nil
-// 	})
-// 	if err != nil {
-// 		log.Errorf(err.Error())
-// 		return nil, err
-// 	}
-
-// 	return list, nil
-// }
-// func ShowRules(ctx *macaron.Context) {
-// 	dir := apiConf.GetString("cdn_create_dir")
-
-// 	// var list NodeList
-// 	var list []*StreamRule
-// 	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
-// 		if f == nil {
-// 			return err
-// 		}
-// 		if !f.IsDir() {
-// 			return nil
-// 		}
-// 		if !strings.HasSuffix(f.Name(), ".node.d") {
-// 			return nil
-// 		}
-
-// 		onelist, err := searchRules(fmt.Sprintf("%s/resource.d", path))
-// 		if err != nil {
-// 			log.Errorf(err.Error())
-// 			return err
-// 		}
-
-// 		list = append(list, onelist...)
-// 		return nil
-// 	})
-
-// 	if err != nil {
-// 		log.Errorf(err.Error())
-// 		ctx.JSON(500, err)
-// 		return
-// 	}
-
-// 	ctx.JSON(200, &list)
-// }
-
-// // touch {{domain}}.conf
-// // docker exec -d {{NodeId}} nginx -s reload
-// func AddRule(r StreamRule) string {
-
-// 	n := &Node{
-// 		NodeId: r.NodeId,
-// 	}
-
-// 	if err := n.AddRule(&r); err != nil {
-// 		return err.Error()
-// 	}
-// 	return "ok"
-// }
-
-// // rm -f {{Http}}.conf
-// // docker exec -d {{NodeId}} nginx -s reload
-// func DelRule(r StreamRule) string {
-// 	// return "ok"
-// 	n := &Node{
-// 		NodeId: r.NodeId,
-// 	}
-
-// 	if err := n.DelRule(&r); err != nil {
-// 		return err.Error()
-// 	}
-// 	return "ok"
-// }
-
 func httpRouter(m *macaron.Macaron) {
 
 	m.Get("/nodes", ShowNodes)
 	m.Post("/nodes", binding.Bind(Node{}), AddNode)
 	m.Delete("/nodes", binding.Bind(Node{}), DelNode)
 
-	// m.Get("/nodes/rules", ShowRules)
-	// m.Post("/nodes/rules", binding.Bind(StreamRule{}), AddRule)
-	// m.Delete("/nodes/rules", binding.Bind(StreamRule{}), DelRule)
+	m.Get("/rules4", ShowRules4)
+	m.Post("/rules4", binding.Bind(Rule4{}), AddRule4)
+	m.Delete("/rules4", binding.Bind(Rule4{}), DelRule4)
 
 	m.Get("/networks", ShowNetworks)
 	m.Post("/networks", binding.Bind(Network{}), AddNetwork)
@@ -248,11 +151,41 @@ func ShowNetworks(ctx *macaron.Context) {
 
 //AddNode :
 func AddNode(n Node) string {
+	invoke := &Invoke{}
+	args := []string{"ps"}
+
+	var err error
+	var byt []byte
+	if byt, err = invoke.Command("docker", args...); err != nil {
+		log.Errorf("cmd: docker %s, err: %s", strings.Join(args, " "), err.Error())
+		log.Errorf("%s", string(byt))
+	}
+
+	nodeArr := strings.Split(string(byt), "\n")
+	for _, one := range nodeArr {
+		rowArr := strings.Fields(one)
+		if len(rowArr) > 2 {
+			if rowArr[0] == "CONTAINER" {
+				continue
+			}
+
+			if rowArr[len(rowArr)-1] == "cdnapi" {
+				continue
+			}
+
+			if n.NodeName == rowArr[len(rowArr)-1] {
+				log.Errorf("name alreay in used.")
+				return "name alreay in used."
+			}
+		} else {
+			continue
+		}
+	}
+
 	if err := n.CreateNode(); err != nil {
 		log.Errorf(err.Error())
 		return err.Error()
 	}
-
 	return "ok"
 }
 
@@ -305,4 +238,101 @@ func ShowNodes(ctx *macaron.Context) {
 	}
 
 	ctx.JSON(200, &list)
+}
+
+/*******************************************************************
+*
+* Rule Here!
+*
+ *******************************************************************/
+
+//AddRule4 :
+func AddRule4(r Rule4) string {
+
+	n := &Node{
+		NodeName: r.NodeName,
+	}
+
+	if err := n.AddRule4(&r); err != nil {
+		return err.Error()
+	}
+	return "ok"
+}
+
+//DelRule4 :
+func DelRule4(r Rule4) string {
+	n := &Node{
+		NodeName: r.NodeName,
+	}
+
+	if err := n.DelRule4(&r); err != nil {
+		return err.Error()
+	}
+	return "ok"
+}
+
+//ShowRules4 :由于不会传参数，就一次性显示
+func ShowRules4(ctx *macaron.Context) {
+	dir := apiConf.GetString("cdn_create_dir")
+
+	// var list NodeList
+	var list []*Rule4
+	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
+		if f == nil {
+			return err
+		}
+		if !f.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(f.Name(), ".node.d") {
+			return nil
+		}
+
+		onelist, err := searchRules(fmt.Sprintf("%s/resource.d", path))
+		if err != nil {
+			log.Errorf(err.Error())
+			return err
+		}
+
+		list = append(list, onelist...)
+		return nil
+	})
+
+	if err != nil {
+		log.Errorf(err.Error())
+		ctx.JSON(500, err)
+		return
+	}
+
+	ctx.JSON(200, &list)
+}
+
+func searchRules(dir string) ([]*Rule4, error) {
+	var list []*Rule4
+	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
+		if f == nil {
+			log.Errorf(err.Error())
+			return err
+		}
+		if f.IsDir() {
+			return nil
+		}
+		var rule Rule4
+		nf, err := os.Open(path)
+		if err != nil {
+			log.Errorf(err.Error())
+			return err
+		}
+		if err := rule.Load(nf); err != nil {
+			log.Errorf(err.Error())
+			return err
+		}
+		list = append(list, &rule)
+		return nil
+	})
+	if err != nil {
+		log.Errorf(err.Error())
+		return nil, err
+	}
+	return list, nil
 }
